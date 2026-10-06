@@ -1,0 +1,14 @@
+.git
+.gitignore
+.venv
+data/
+notebooks/
+reports/
+__pycache__/
+*.py[cod]
+*.log
+.ipynb_checkpoints/
+.pytest_cache/
+*.xlsx
+*.zip
+*.tar.gz

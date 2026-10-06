@@ -20,14 +20,21 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from lightgbm import LGBMRegressor
+try:
+    from lightgbm import LGBMRegressor
+except ImportError:
+    LGBMRegressor = None
+
+try:
+    from xgboost import XGBRegressor
+except ImportError:
+    XGBRegressor = None
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import KFold, train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from xgboost import XGBRegressor
 
 from src.data_prep import PROJECT_ROOT
 from src.features import FEATURE_COLUMNS, TARGET_COLUMN
@@ -78,14 +85,17 @@ def build_candidate_models(random_state=RANDOM_SEED):
     split on thresholds and are scale-invariant, so scaling them would add a
     fitted step with no benefit.
     """
-    return {
+    candidates = {
         "LinearRegression": Pipeline(
             [("scaler", StandardScaler()), ("model", LinearRegression())]
         ),
         "RandomForest": RandomForestRegressor(random_state=random_state, n_jobs=-1),
-        "XGBoost": XGBRegressor(random_state=random_state, n_jobs=-1),
-        "LightGBM": LGBMRegressor(random_state=random_state, n_jobs=-1, verbose=-1),
     }
+    if XGBRegressor is not None:
+        candidates["XGBoost"] = XGBRegressor(random_state=random_state, n_jobs=-1)
+    if LGBMRegressor is not None:
+        candidates["LightGBM"] = LGBMRegressor(random_state=random_state, n_jobs=-1, verbose=-1)
+    return candidates
 
 
 def predict_monetary(model, X):
@@ -193,8 +203,12 @@ def suggest_params(trial, model_name):
 def build_tuned_model(model_name, params, random_state=RANDOM_SEED):
     """Instantiate a model of the winning type with the given hyperparameters."""
     if model_name == "XGBoost":
+        if XGBRegressor is None:
+            raise ImportError("xgboost is not installed.")
         return XGBRegressor(random_state=random_state, n_jobs=-1, **params)
     if model_name == "LightGBM":
+        if LGBMRegressor is None:
+            raise ImportError("lightgbm is not installed.")
         return LGBMRegressor(random_state=random_state, n_jobs=-1, verbose=-1, **params)
     if model_name == "RandomForest":
         return RandomForestRegressor(random_state=random_state, n_jobs=-1, **params)
