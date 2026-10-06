@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Lifetime Value (CLV) Predictor</title>
+  <!-- Tailwind CSS & Lucide Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .tab-active { border-bottom: 2px solid #6366f1; color: #6366f1; font-weight: 600; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+  <!-- Top Navigation Bar -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <div class="flex items-center space-x-3">
+          <div class="bg-indigo-600 text-white p-2 rounded-xl shadow-md shadow-indigo-100 flex items-center justify-center">
+            <i data-lucide="trending-up" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h1 class="text-lg font-bold text-slate-900 leading-tight">CLV Forecast Studio</h1>
+            <p class="text-xs text-slate-500 font-medium">90-Day E-Commerce Value Engine</p>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+          <div id="system-status" class="flex items-center space-x-2 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-xs font-semibold border border-emerald-200">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span id="status-text">Model Active (RF Tuned)</span>
+          </div>
+          <a href="/docs" target="_blank" class="text-xs font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition inline-flex items-center space-x-1">
+            <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+            <span>API Docs</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="flex space-x-8 -mb-px">
+        <button onclick="switchTab('single')" id="tab-btn-single" class="tab-btn tab-active py-3 px-1 text-sm flex items-center space-x-2 border-b-2 transition">
+          <i data-lucide="user-check" class="w-4 h-4"></i>
+          <span>Single Customer Calculator</span>
+        </button>
+        <button onclick="switchTab('transactions')" id="tab-btn-transactions" class="tab-btn text-slate-500 hover:text-slate-700 py-3 px-1 text-sm flex items-center space-x-2 border-b-2 border-transparent transition">
+          <i data-lucide="receipt" class="w-4 h-4"></i>
+          <span>Transaction Ingestion</span>
+        </button>
+        <button onclick="switchTab('batch')" id="tab-btn-batch" class="tab-btn text-slate-500 hover:text-slate-700 py-3 px-1 text-sm flex items-center space-x-2 border-b-2 border-transparent transition">
+          <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+          <span>Batch CSV Scorer</span>
+        </button>
+        <button onclick="switchTab('telemetry')" id="tab-btn-telemetry" class="tab-btn text-slate-500 hover:text-slate-700 py-3 px-1 text-sm flex items-center space-x-2 border-b-2 border-transparent transition">
+          <i data-lucide="bar-chart-2" class="w-4 h-4"></i>
+          <span>Model Telemetry & Lift</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+
+    <!-- ==================== TAB 1: SINGLE CUSTOMER ==================== -->
+    <section id="tab-single" class="tab-content">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Input Form (Left 7 cols) -->
+        <div class="lg:col-span-7 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <div class="flex justify-between items-center mb-4">
+            <div>
+              <h2 class="text-base font-bold text-slate-900">Customer Profile & RFM Features</h2>
+              <p class="text-xs text-slate-500">Provide the 11 observation features or load an archetypal profile</p>
+            </div>
+            <!-- Quick Preset Chips -->
+            <div class="flex items-center space-x-1.5">
+              <span class="text-xs text-slate-400 font-medium">Presets:</span>
+              <button onclick="loadPreset('vip')" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 transition">VIP</button>
+              <button onclick="loadPreset('winback')" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 transition">Win-Back</button>
+              <button onclick="loadPreset('core')" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition">Core</button>
+              <button onclick="loadPreset('dormant')" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition">Dormant</button>
+            </div>
+          </div>
+
+          <form id="single-predict-form" onsubmit="handleSinglePredict(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Customer Identifier (Optional)</label>
+              <input type="text" id="cust-id" value="CUST_14646" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+
+            <!-- RFM Grid -->
+            <div class="pt-2">
+              <h3 class="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-2 flex items-center space-x-1">
+                <i data-lucide="coins" class="w-3.5 h-3.5"></i>
+                <span>RFM Core Metrics</span>
+              </h3>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <label class="block text-xs text-slate-600 mb-1">Recency (Days)</label>
+                  <input type="number" step="any" min="0" id="recency_days" value="12" required class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-600 mb-1">Frequency (Orders)</label>
+                  <input type="number" min="1" id="frequency" value="18" required class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-600 mb-1">Monetary Total (£)</label>
+                  <input type="number" step="any" min="0" id="monetary_total" value="4520.50" required class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-600 mb-1">Avg Order Value (£)</label>
+                  <input type="number" step="any" min="0" id="monetary_avg_order" value="251.14" required class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+              </div>
+            </div>
+
+            <!-- Tenure & Cadence Grid -->
+            <div class="pt-2">
+              <h3 class="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-2 flex items-center space-x-1">
+                <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+                <span>Tenure & Temporal Cadence</span>
+              </h3>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <label class="block text-xs text-slate-600 mb-1">Tenure (Days)</label>
+                  <input type="number" step="any" min="0" id="tenure_days" value="320" required class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-600 mb-1">Avg Days Gap</label>
+                  <input type="number" step="any" min="0" id="avg_days_between_orders" value="18.82" required class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-600 mb-1">Active Months</label>
+                  <input type="number" min="1" id="active_months" value="8" required class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-600 mb-1">Monthly Spend (£)</label>
+                  <input type="number" step="any" min="0" id="average_monthly_spend" value="430.52" required class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+              </div>
+            </div>
+
+            <!-- Breadth & Basket Grid -->
+            <div class="pt-2">
+              <h3 class="text-xs font-bold text-indigo-700 uppercase tracking-wider mb-2 flex items-center space-x-1">
+                <i data-lucide="package" class="w-3.5 h-3.5"></i>
+                <span>Breadth & Basket Properties</span>
+              </h3>
+              <div class="grid grid-cols-3 gap-3">
+                <div>
+                  <label class="block text-xs text-slate-600 mb-1">Unique Products</label>
+                  <input type="number" min="1" id="n_unique_products" value="125" required class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-600 mb-1">Avg Basket Size</label>
+                  <input type="number" step="any" min="0" id="avg_basket_size" value="42.5" required class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-600 mb-1">One-Off Buyer?</label>
+                  <select id="has_single_purchase" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <option value="0" selected>No (Repeat Buyer)</option>
+                    <option value="1">Yes (1 Purchase Only)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <button type="submit" id="single-submit-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-xl shadow-md transition flex items-center justify-center space-x-2 mt-4">
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+              <span>Forecast 90-Day Lifetime Value</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- Prediction Result Display (Right 5 cols) -->
+        <div class="lg:col-span-5 space-y-6">
+          <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h2 class="text-base font-bold text-slate-900 mb-1">Prediction Outcome</h2>
+            <p class="text-xs text-slate-500 mb-4">Model estimate on original monetary scale (£)</p>
+
+            <div id="single-result-placeholder" class="py-12 text-center text-slate-400">
+              <i data-lucide="calculator" class="w-12 h-12 mx-auto stroke-1 text-slate-300 mb-2"></i>
+              <p class="text-sm">Click "Forecast 90-Day Lifetime Value" to calculate CLV</p>
+            </div>
+
+            <div id="single-result-card" class="hidden space-y-5">
+              <!-- Big Value Display -->
+              <div class="bg-gradient-to-br from-indigo-50 via-white to-indigo-50/50 p-5 rounded-2xl border border-indigo-100 text-center">
+                <span class="text-xs font-semibold text-indigo-600 uppercase tracking-wider">Forecasted 90-Day Spend</span>
+                <div class="text-4xl font-extrabold text-slate-900 mt-1" id="res-clv-val">£0.00</div>
+                <div class="flex items-center justify-center space-x-2 mt-3">
+                  <span id="res-tier-badge" class="px-3 py-1 text-xs font-bold rounded-full bg-indigo-100 text-indigo-800">Tier 1: VIP</span>
+                  <span id="res-decile-badge" class="px-3 py-1 text-xs font-bold rounded-full bg-slate-100 text-slate-700">Decile 1 (5.4× Lift)</span>
+                </div>
+              </div>
+
+              <!-- Recommendation Block -->
+              <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div class="flex items-start space-x-2.5">
+                  <div class="p-1.5 rounded-lg bg-indigo-100 text-indigo-600 mt-0.5">
+                    <i data-lucide="lightbulb" class="w-4 h-4"></i>
+                  </div>
+                  <div>
+                    <h4 class="text-xs font-bold text-slate-900">Recommended Retention Action</h4>
+                    <p class="text-xs text-slate-600 mt-1 leading-relaxed" id="res-recommendation">—</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Decile Benchmark Comparison -->
+              <div>
+                <h4 class="text-xs font-bold text-slate-700 mb-2">Customer Value Concentration Context</h4>
+                <div class="space-y-1.5 text-xs">
+                  <div class="flex justify-between text-slate-600">
+                    <span>Decile 1 Mean: <b class="text-slate-800">£1,640.34</b></span>
+                    <span>Captures <b class="text-indigo-600">54.2%</b> of total revenue</span>
+                  </div>
+                  <div class="w-full bg-slate-100 rounded-full h-2">
+                    <div id="res-percent-bar" class="bg-indigo-600 h-2 rounded-full transition-all duration-500" style="width: 54%"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==================== TAB 2: TRANSACTION INGESTION ==================== -->
+    <section id="tab-transactions" class="tab-content hidden">
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+        <div class="flex justify-between items-start">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Dynamic Transaction Pipeline</h2>
+            <p class="text-xs text-slate-500">Input customer purchase events. The engine automatically filters returns and computes the 11 RFM features.</p>
+          </div>
+          <button onclick="loadSampleTransactions()" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition flex items-center space-x-1">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <span>Load Sample Order History</span>
+          </button>
+        </div>
+
+        <!-- Transaction Table -->
+        <div class="overflow-x-auto border border-slate-200 rounded-xl">
+          <table class="w-full text-xs text-left" id="tx-table">
+            <thead class="bg-slate-50 text-slate-600 uppercase border-b border-slate-200">
+              <tr>
+                <th class="py-2.5 px-3">Invoice</th>
+                <th class="py-2.5 px-3">StockCode</th>
+                <th class="py-2.5 px-3">Description</th>
+                <th class="py-2.5 px-3">Qty</th>
+                <th class="py-2.5 px-3">Price (£)</th>
+                <th class="py-2.5 px-3">Date</th>
+                <th class="py-2.5 px-3 w-10"></th>
+              </tr>
+            </thead>
+            <tbody id="tx-tbody" class="divide-y divide-slate-100">
+              <!-- Dynamically populated rows -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="flex justify-between items-center pt-2">
+          <button onclick="addTransactionRow()" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 transition flex items-center space-x-1">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            <span>Add Transaction Row</span>
+          </button>
+
+          <button onclick="submitTransactions()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-6 rounded-xl shadow-md transition flex items-center space-x-2 text-sm">
+            <i data-lucide="calculator" class="w-4 h-4"></i>
+            <span>Extract Features & Predict</span>
+          </button>
+        </div>
+
+        <!-- Derived Features & Prediction Display -->
+        <div id="tx-result-container" class="hidden pt-4 border-t border-slate-200 space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Derived Features -->
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <h4 class="text-xs font-bold text-slate-800 mb-2">Engineered Feature Vector (Cleaned)</h4>
+              <div class="grid grid-cols-2 gap-2 text-xs" id="tx-derived-features-grid"></div>
+            </div>
+
+            <!-- Prediction Result -->
+            <div class="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 flex flex-col justify-center text-center">
+              <span class="text-xs font-semibold text-indigo-600">Calculated 90-Day CLV</span>
+              <div class="text-3xl font-extrabold text-slate-900 mt-1" id="tx-res-clv">£0.00</div>
+              <div class="mt-2" id="tx-res-tier-badge"></div>
+              <p class="text-xs text-slate-600 mt-2" id="tx-res-rec">—</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==================== TAB 3: BATCH CSV SCORING ==================== -->
+    <section id="tab-batch" class="tab-content hidden">
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+        <div class="flex justify-between items-start">
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Batch Customer Scoring</h2>
+            <p class="text-xs text-slate-500">Score thousands of customer records instantly. Upload a CSV with the 11 feature columns.</p>
+          </div>
+          <button onclick="downloadSampleCsv()" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition flex items-center space-x-1">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            <span>Download Sample CSV Template</span>
+          </button>
+        </div>
+
+        <!-- Drag & Drop Zone -->
+        <div id="drop-zone" onclick="document.getElementById('csv-file-input').click()" class="border-2 border-dashed border-slate-300 hover:border-indigo-500 rounded-2xl p-8 text-center cursor-pointer transition bg-slate-50 hover:bg-indigo-50/30">
+          <input type="file" id="csv-file-input" accept=".csv" class="hidden" onchange="handleCsvFile(event)">
+          <i data-lucide="file-spreadsheet" class="w-10 h-10 mx-auto text-indigo-600 mb-2"></i>
+          <p class="text-sm font-semibold text-slate-800">Click to upload or drag & drop CSV file</p>
+          <p class="text-xs text-slate-500 mt-1">Must contain the 11 customer features columns</p>
+        </div>
+
+        <!-- Batch Summary Metrics -->
+        <div id="batch-summary" class="hidden space-y-6">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <div class="text-xs text-slate-500 font-medium">Total Customers</div>
+              <div class="text-2xl font-extrabold text-slate-900 mt-1" id="batch-total-cust">0</div>
+            </div>
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <div class="text-xs text-slate-500 font-medium">90d Forecasted Revenue</div>
+              <div class="text-2xl font-extrabold text-emerald-600 mt-1" id="batch-total-rev">£0.00</div>
+            </div>
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <div class="text-xs text-slate-500 font-medium">Average 90d CLV</div>
+              <div class="text-2xl font-extrabold text-indigo-600 mt-1" id="batch-avg-clv">£0.00</div>
+            </div>
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <div class="text-xs text-slate-500 font-medium">VIP & Core Customers</div>
+              <div class="text-2xl font-extrabold text-purple-600 mt-1" id="batch-high-val">0</div>
+            </div>
+          </div>
+
+          <!-- Decile Chart -->
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <h4 class="text-xs font-bold text-slate-800 mb-3">Predicted Value Distribution by Tier</h4>
+            <div class="h-56">
+              <canvas id="tierChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Table & Export -->
+          <div>
+            <div class="flex justify-between items-center mb-3">
+              <h4 class="text-xs font-bold text-slate-800">Scored Customers Preview</h4>
+              <button onclick="exportScoredCsv()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-1.5 px-3 rounded-lg text-xs flex items-center space-x-1 shadow transition">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                <span>Export Scored CSV</span>
+              </button>
+            </div>
+            <div class="overflow-x-auto border border-slate-200 rounded-xl">
+              <table class="w-full text-xs text-left" id="batch-table">
+                <thead class="bg-slate-50 text-slate-600 uppercase border-b border-slate-200">
+                  <tr>
+                    <th class="py-2.5 px-3">Customer ID</th>
+                    <th class="py-2.5 px-3">Forecasted CLV (£)</th>
+                    <th class="py-2.5 px-3">Value Tier</th>
+                    <th class="py-2.5 px-3">Decile</th>
+                    <th class="py-2.5 px-3">Action Strategy</th>
+                  </tr>
+                </thead>
+                <tbody id="batch-tbody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==================== TAB 4: TELEMETRY & INSIGHTS ==================== -->
+    <section id="tab-telemetry" class="tab-content hidden">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        
+        <!-- Architecture Card -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+          <div class="flex items-center space-x-2">
+            <div class="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+              <i data-lucide="cpu" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">Production Model Specification</h3>
+              <p class="text-xs text-slate-500">Tuned on UCI Online Retail II dataset</p>
+            </div>
+          </div>
+
+          <div class="divide-y divide-slate-100 text-xs">
+            <div class="py-2.5 flex justify-between">
+              <span class="text-slate-500">Architecture</span>
+              <span class="font-semibold text-slate-800">RandomForestRegressor (450 Estimators)</span>
+            </div>
+            <div class="py-2.5 flex justify-between">
+              <span class="text-slate-500">Target Transformation</span>
+              <span class="font-semibold text-slate-800">log1p(future_clv) -> expm1 monetary scale</span>
+            </div>
+            <div class="py-2.5 flex justify-between">
+              <span class="text-slate-500">Cross-Validated MAE</span>
+              <span class="font-semibold text-emerald-600">£386.55 (Optuna 5-Fold CV)</span>
+            </div>
+            <div class="py-2.5 flex justify-between">
+              <span class="text-slate-500">Unseen Test Set MAE</span>
+              <span class="font-semibold text-indigo-600">£332.13 (26.8% lift over baseline)</span>
+            </div>
+            <div class="py-2.5 flex justify-between">
+              <span class="text-slate-500">Temporal Horizon</span>
+              <span class="font-semibold text-slate-800">90 Days Post-Cutoff</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Decile Lift Card -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+          <div class="flex items-center space-x-2">
+            <div class="p-2 bg-purple-50 text-purple-600 rounded-xl">
+              <i data-lucide="award" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">Decile Lift Benchmark</h3>
+              <p class="text-xs text-slate-500">Monotonic value capture across customer deciles</p>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+              <thead class="bg-slate-50 text-slate-600 border-b border-slate-200">
+                <tr>
+                  <th class="py-1.5 px-2">Decile</th>
+                  <th class="py-1.5 px-2">Mean Pred</th>
+                  <th class="py-1.5 px-2">Mean Actual</th>
+                  <th class="py-1.5 px-2">% Revenue</th>
+                  <th class="py-1.5 px-2">Lift</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 text-slate-700">
+                <tr class="bg-purple-50/50 font-semibold text-purple-900">
+                  <td class="py-1.5 px-2">1 (Top 10%)</td>
+                  <td class="py-1.5 px-2">£1,640.34</td>
+                  <td class="py-1.5 px-2">£2,446.47</td>
+                  <td class="py-1.5 px-2">54.2%</td>
+                  <td class="py-1.5 px-2">5.39×</td>
+                </tr>
+                <tr>
+                  <td class="py-1.5 px-2">2</td>
+                  <td class="py-1.5 px-2">£169.52</td>
+                  <td class="py-1.5 px-2">£574.04</td>
+                  <td class="py-1.5 px-2">12.6%</td>
+                  <td class="py-1.5 px-2">1.27×</td>
+                </tr>
+                <tr>
+                  <td class="py-1.5 px-2">3</td>
+                  <td class="py-1.5 px-2">£61.11</td>
+                  <td class="py-1.5 px-2">£437.49</td>
+                  <td class="py-1.5 px-2">9.7%</td>
+                  <td class="py-1.5 px-2">0.96×</td>
+                </tr>
+                <tr>
+                  <td class="py-1.5 px-2">4</td>
+                  <td class="py-1.5 px-2">£26.27</td>
+                  <td class="py-1.5 px-2">£375.20</td>
+                  <td class="py-1.5 px-2">8.2%</td>
+                  <td class="py-1.5 px-2">0.83×</td>
+                </tr>
+                <tr>
+                  <td class="py-1.5 px-2">5-10</td>
+                  <td class="py-1.5 px-2">≤ £12.67</td>
+                  <td class="py-1.5 px-2">≤ £209.10</td>
+                  <td class="py-1.5 px-2">15.3%</td>
+                  <td class="py-1.5 px-2">≤ 0.46×</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+    CLV Prediction Engine • Leakage-Free Temporal Cutoff • Trained with Scikit-Learn & Optuna
+  </footer>
+
+  <!-- Application Logic JavaScript -->
+  <script>
+    lucide.createIcons();
+
+    // Tab Switching
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('tab-active', 'text-indigo-600');
+        btn.classList.add('text-slate-500', 'border-transparent');
+      });
+
+      document.getElementById('tab-' + tabId).classList.remove('hidden');
+      const activeBtn = document.getElementById('tab-btn-' + tabId);
+      activeBtn.classList.add('tab-active');
+      activeBtn.classList.remove('text-slate-500', 'border-transparent');
+    }
+
+    // Preset Profiles
+    const PRESETS = {
+      vip: {
+        id: "CUST_VIP_14646",
+        recency: 12, freq: 18, total: 4520.50, aov: 251.14,
+        tenure: 320, gap: 18.82, months: 8, monthly: 430.52,
+        products: 125, basket: 42.5, single: "0"
+      },
+      winback: {
+        id: "CUST_WINBACK_99",
+        recency: 340, freq: 14, total: 6800.0, aov: 485.71,
+        tenure: 400, gap: 28.5, months: 9, monthly: 517.5,
+        products: 90, basket: 55.0, single: "0"
+      },
+      core: {
+        id: "CUST_CORE_44",
+        recency: 25, freq: 6, total: 850.0, aov: 141.67,
+        tenure: 180, gap: 30.0, months: 5, monthly: 143.7,
+        products: 35, basket: 15.0, single: "0"
+      },
+      dormant: {
+        id: "CUST_DORMANT_01",
+        recency: 290, freq: 1, total: 45.0, aov: 45.0,
+        tenure: 290, gap: 290.0, months: 1, monthly: 4.7,
+        products: 3, basket: 4.0, single: "1"
+      }
+    };
+
+    function loadPreset(key) {
+      const p = PRESETS[key];
+      if (!p) return;
+      document.getElementById('cust-id').value = p.id;
+      document.getElementById('recency_days').value = p.recency;
+      document.getElementById('frequency').value = p.freq;
+      document.getElementById('monetary_total').value = p.total;
+      document.getElementById('monetary_avg_order').value = p.aov;
+      document.getElementById('tenure_days').value = p.tenure;
+      document.getElementById('avg_days_between_orders').value = p.gap;
+      document.getElementById('active_months').value = p.months;
+      document.getElementById('average_monthly_spend').value = p.monthly;
+      document.getElementById('n_unique_products').value = p.products;
+      document.getElementById('avg_basket_size').value = p.basket;
+      document.getElementById('has_single_purchase').value = p.single;
+    }
+
+    // Single Prediction Submit
+    async function handleSinglePredict(e) {
+      e.preventDefault();
+      const payload = {
+        customer_id: document.getElementById('cust-id').value || null,
+        recency_days: parseFloat(document.getElementById('recency_days').value),
+        frequency: parseInt(document.getElementById('frequency').value),
+        monetary_total: parseFloat(document.getElementById('monetary_total').value),
+        monetary_avg_order: parseFloat(document.getElementById('monetary_avg_order').value),
+        tenure_days: parseFloat(document.getElementById('tenure_days').value),
+        avg_days_between_orders: parseFloat(document.getElementById('avg_days_between_orders').value),
+        active_months: parseInt(document.getElementById('active_months').value),
+        average_monthly_spend: parseFloat(document.getElementById('average_monthly_spend').value),
+        n_unique_products: parseInt(document.getElementById('n_unique_products').value),
+        avg_basket_size: parseFloat(document.getElementById('avg_basket_size').value),
+        has_single_purchase: parseInt(document.getElementById('has_single_purchase').value)
+      };
+
+      try {
+        const btn = document.getElementById('single-submit-btn');
+        btn.disabled = true;
+        btn.innerHTML = `<span class="animate-spin inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></span> Calculating...`;
+
+        const res = await fetch('/predict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+
+        // Render response
+        document.getElementById('single-result-placeholder').classList.add('hidden');
+        document.getElementById('single-result-card').classList.remove('hidden');
+
+        document.getElementById('res-clv-val').textContent = `£${data.predicted_clv_90d.toFixed(2)}`;
+        document.getElementById('res-tier-badge').textContent = data.value_tier;
+        document.getElementById('res-decile-badge').textContent = `Decile ${data.estimated_decile}`;
+        document.getElementById('res-recommendation').textContent = data.actionable_recommendation;
+
+        // Visual bar based on decile
+        const barWidth = Math.max(10, Math.min(100, (11 - data.estimated_decile) * 10));
+        document.getElementById('res-percent-bar').style.width = barWidth + '%';
+
+      } catch (err) {
+        alert('Prediction error: ' + err.message);
+      } finally {
+        const btn = document.getElementById('single-submit-btn');
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4 mr-2 inline"></i> Forecast 90-Day Lifetime Value`;
+        lucide.createIcons();
+      }
+    }
+
+    // Sample Transactions
+    const SAMPLE_TXS = [
+      { Invoice: "536365", StockCode: "85123A", Description: "WHITE HANGING HEART T-LIGHT HOLDER", Quantity: 6, Price: 2.55, InvoiceDate: "2011-04-10" },
+      { Invoice: "536366", StockCode: "22423", Description: "REGENCY CAKESTAND 3 TIER", Quantity: 3, Price: 12.75, InvoiceDate: "2011-05-18" },
+      { Invoice: "536367", StockCode: "47566", Description: "PARTY BUNTING", Quantity: 10, Price: 4.95, InvoiceDate: "2011-06-25" },
+      { Invoice: "536368", StockCode: "84879", Description: "ASSORTED COLOUR BIRD ORNAMENT", Quantity: 8, Price: 1.69, InvoiceDate: "2011-08-14" },
+      { Invoice: "C536369", StockCode: "22423", Description: "Return Adjustment", Quantity: -1, Price: 12.75, InvoiceDate: "2011-08-15" }
+    ];
+
+    function renderTransactionRows(list) {
+      const tbody = document.getElementById('tx-tbody');
+      tbody.innerHTML = '';
+      list.forEach((tx, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = tx.Invoice.startsWith('C') || tx.Quantity <= 0 ? 'bg-rose-50/50' : 'hover:bg-slate-50';
+        tr.innerHTML = `
+          <td class="py-2 px-3"><input type="text" class="tx-invoice border rounded px-1.5 py-1 w-20 text-xs" value="${tx.Invoice}"></td>
+          <td class="py-2 px-3"><input type="text" class="tx-stock border rounded px-1.5 py-1 w-20 text-xs" value="${tx.StockCode}"></td>
+          <td class="py-2 px-3"><input type="text" class="tx-desc border rounded px-1.5 py-1 w-full text-xs" value="${tx.Description}"></td>
+          <td class="py-2 px-3"><input type="number" class="tx-qty border rounded px-1.5 py-1 w-16 text-xs" value="${tx.Quantity}"></td>
+          <td class="py-2 px-3"><input type="number" step="any" class="tx-price border rounded px-1.5 py-1 w-16 text-xs" value="${tx.Price}"></td>
+          <td class="py-2 px-3"><input type="date" class="tx-date border rounded px-1.5 py-1 w-28 text-xs" value="${tx.InvoiceDate}"></td>
+          <td class="py-2 px-3 text-center">
+            <button onclick="this.closest('tr').remove()" class="text-rose-500 hover:text-rose-700"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      lucide.createIcons();
+    }
+
+    function loadSampleTransactions() {
+      renderTransactionRows(SAMPLE_TXS);
+    }
+
+    function addTransactionRow() {
+      const tbody = document.getElementById('tx-tbody');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="py-2 px-3"><input type="text" class="tx-invoice border rounded px-1.5 py-1 w-20 text-xs" value="537000"></td>
+        <td class="py-2 px-3"><input type="text" class="tx-stock border rounded px-1.5 py-1 w-20 text-xs" value="22423"></td>
+        <td class="py-2 px-3"><input type="text" class="tx-desc border rounded px-1.5 py-1 w-full text-xs" value="NEW MERCHANDISE ITEM"></td>
+        <td class="py-2 px-3"><input type="number" class="tx-qty border rounded px-1.5 py-1 w-16 text-xs" value="5"></td>
+        <td class="py-2 px-3"><input type="number" step="any" class="tx-price border rounded px-1.5 py-1 w-16 text-xs" value="3.50"></td>
+        <td class="py-2 px-3"><input type="date" class="tx-date border rounded px-1.5 py-1 w-28 text-xs" value="${new Date().toISOString().split('T')[0]}"></td>
+        <td class="py-2 px-3 text-center">
+          <button onclick="this.closest('tr').remove()" class="text-rose-500 hover:text-rose-700"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+      lucide.createIcons();
+    }
+
+    async function submitTransactions() {
+      const rows = document.querySelectorAll('#tx-tbody tr');
+      if (rows.length === 0) {
+        alert('Please add at least one transaction row.');
+        return;
+      }
+
+      const txList = [];
+      rows.forEach(r => {
+        txList.push({
+          Invoice: r.querySelector('.tx-invoice').value,
+          StockCode: r.querySelector('.tx-stock').value,
+          Description: r.querySelector('.tx-desc').value,
+          Quantity: parseInt(r.querySelector('.tx-qty').value) || 0,
+          Price: parseFloat(r.querySelector('.tx-price').value) || 0,
+          InvoiceDate: r.querySelector('.tx-date').value
+        });
+      });
+
+      try {
+        const res = await fetch('/predict/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transactions: txList })
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+
+        // Populate results
+        document.getElementById('tx-result-container').classList.remove('hidden');
+        document.getElementById('tx-res-clv').textContent = `£${data.prediction.predicted_clv_90d.toFixed(2)}`;
+        document.getElementById('tx-res-tier-badge').innerHTML = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-indigo-100 text-indigo-800">${data.prediction.value_tier} (Decile ${data.prediction.estimated_decile})</span>`;
+        document.getElementById('tx-res-rec').textContent = data.prediction.actionable_recommendation;
+
+        const grid = document.getElementById('tx-derived-features-grid');
+        grid.innerHTML = '';
+        for (const [k, v] of Object.entries(data.derived_features)) {
+          grid.innerHTML += `<div class="bg-white p-2 rounded-lg border border-slate-200"><span class="text-slate-400 block text-[10px] uppercase font-semibold">${k}</span><span class="font-bold text-slate-800">${v}</span></div>`;
+        }
+
+      } catch (err) {
+        alert('Transaction processing error: ' + err.message);
+      }
+    }
+
+    // Batch Scorer logic
+    let scoredDataCache = [];
+    let tierChartInstance = null;
+
+    function downloadSampleCsv() {
+      const headers = "customer_id,recency_days,frequency,monetary_total,monetary_avg_order,tenure_days,avg_days_between_orders,active_months,average_monthly_spend,n_unique_products,avg_basket_size,has_single_purchase\n";
+      const sample1 = "CUST_1001,15,12,3200.50,266.71,310,28.18,8,314.41,95,35.2,0\n";
+      const sample2 = "CUST_1002,240,2,85.00,42.50,260,130.00,2,9.94,5,6.0,0\n";
+      const sample3 = "CUST_1003,5,28,9500.00,339.28,360,13.33,11,804.30,160,52.0,0\n";
+      const blob = new Blob([headers + sample1 + sample2 + sample3], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = "customer_features_sample.csv";
+      a.click();
+    }
+
+    async function handleCsvFile(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const text = await file.text();
+      const lines = text.trim().split('\n');
+      if (lines.length < 2) {
+        alert('CSV must contain a header and at least one data row.');
+        return;
+      }
+
+      const headers = lines[0].split(',').map(h => h.trim());
+      const customers = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const parts = lines[i].split(',').map(p => p.trim());
+        if (parts.length < headers.length) continue;
+        const row = {};
+        headers.forEach((h, idx) => {
+          if (h === 'customer_id') {
+            row[h] = parts[idx];
+          } else if (['frequency', 'active_months', 'n_unique_products', 'has_single_purchase'].includes(h)) {
+            row[h] = parseInt(parts[idx]) || 0;
+          } else {
+            row[h] = parseFloat(parts[idx]) || 0.0;
+          }
+        });
+        customers.push(row);
+      }
+
+      if (customers.length === 0) {
+        alert('No valid customer records parsed from CSV.');
+        return;
+      }
+
+      // Send to Batch API
+      try {
+        const res = await fetch('/predict/batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customers: customers })
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        scoredDataCache = data.predictions;
+
+        // Populate Summary
+        document.getElementById('batch-summary').classList.remove('hidden');
+        document.getElementById('batch-total-cust').textContent = data.total_customers.toLocaleString();
+        document.getElementById('batch-total-rev').textContent = `£${data.total_predicted_revenue_90d.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+        document.getElementById('batch-avg-clv').textContent = `£${data.average_predicted_clv_90d.toFixed(2)}`;
+        document.getElementById('batch-high-val').textContent = data.high_value_customers_count.toLocaleString();
+
+        // Render Table
+        const tbody = document.getElementById('batch-tbody');
+        tbody.innerHTML = '';
+        data.predictions.slice(0, 20).forEach(p => {
+          tbody.innerHTML += `
+            <tr class="hover:bg-slate-50">
+              <td class="py-2 px-3 font-semibold text-slate-800">${p.customer_id || 'N/A'}</td>
+              <td class="py-2 px-3 font-bold text-slate-900">£${p.predicted_clv_90d.toFixed(2)}</td>
+              <td class="py-2 px-3"><span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-indigo-50 text-indigo-700">${p.value_tier}</span></td>
+              <td class="py-2 px-3 text-slate-600">Decile ${p.estimated_decile}</td>
+              <td class="py-2 px-3 text-slate-500 text-[11px]">${p.actionable_recommendation}</td>
+            </tr>
+          `;
+        });
+
+        // Render Chart
+        renderTierChart(data.predictions);
+
+      } catch (err) {
+        alert('Batch prediction failed: ' + err.message);
+      }
+    }
+
+    function renderTierChart(predictions) {
+      const counts = { 'Tier 1: VIP': 0, 'Tier 2: Core': 0, 'Tier 3: Moderate': 0, 'Tier 4: Low': 0, 'Tier 5: Dormant': 0 };
+      predictions.forEach(p => {
+        if (p.value_tier.includes('VIP')) counts['Tier 1: VIP']++;
+        else if (p.value_tier.includes('Core')) counts['Tier 2: Core']++;
+        else if (p.value_tier.includes('Moderate')) counts['Tier 3: Moderate']++;
+        else if (p.value_tier.includes('Low')) counts['Tier 4: Low']++;
+        else counts['Tier 5: Dormant']++;
+      });
+
+      const ctx = document.getElementById('tierChart').getContext('2d');
+      if (tierChartInstance) tierChartInstance.destroy();
+
+      tierChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(counts),
+          datasets: [{
+            label: 'Customer Count',
+            data: Object.values(counts),
+            backgroundColor: ['#8b5cf6', '#3b82f6', '#06b6d4', '#f59e0b', '#ef4444'],
+            borderRadius: 8
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' } }, x: { grid: { display: false } } }
+        }
+      });
+    }
+
+    function exportScoredCsv() {
+      if (scoredDataCache.length === 0) return;
+      let csv = "customer_id,predicted_clv_90d,value_tier,estimated_decile,actionable_recommendation\n";
+      scoredDataCache.forEach(p => {
+        csv += `"${p.customer_id || ''}",${p.predicted_clv_90d},"${p.value_tier}",${p.estimated_decile},"${p.actionable_recommendation}"\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = "scored_customers_clv.csv";
+      a.click();
+    }
+
+    // Initialize sample transactions on load
+    loadSampleTransactions();
+  </script>
+</body>
+</html>

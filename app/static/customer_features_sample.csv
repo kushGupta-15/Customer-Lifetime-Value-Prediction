@@ -1,0 +1,7 @@
+customer_id,recency_days,frequency,monetary_total,monetary_avg_order,tenure_days,avg_days_between_orders,active_months,average_monthly_spend,n_unique_products,avg_basket_size,has_single_purchase
+CUST_14646,12.0,18,4520.50,251.14,320.0,18.82,8,430.52,125,42.5,0
+CUST_18102,5.0,28,9850.00,351.79,350.0,12.96,11,856.24,180,65.0,0
+CUST_12347,22.0,7,1250.00,178.57,210.0,35.00,6,181.16,45,22.0,0
+CUST_15311,350.0,15,6200.00,413.33,420.0,30.00,9,449.34,110,48.0,0
+CUST_17841,180.0,2,95.00,47.50,200.0,200.00,2,14.46,8,5.5,0
+CUST_13089,290.0,1,38.50,38.50,290.0,290.00,1,4.04,4,3.0,1
