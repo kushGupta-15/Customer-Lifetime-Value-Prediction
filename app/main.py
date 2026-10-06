@@ -6,11 +6,14 @@ batch scoring, on-the-fly transaction feature extraction, and model telemetry.
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import List
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.schemas import (
     BatchPredictionRequest,
@@ -79,15 +82,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Static assets setup
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.get("/dashboard", response_class=HTMLResponse, tags=["General"])
+def dashboard():
+    """Interactive CLV Forecast Studio web interface."""
+    index_file = STATIC_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    raise HTTPException(status_code=404, detail="Dashboard UI not found.")
 
 
 @app.get("/", tags=["General"])
-def root():
-    """Service landing page and navigation guide."""
+def root(request: Request):
+    """Service landing page. Delivers dashboard UI to browsers and JSON metadata to API clients."""
+    accept_header = request.headers.get("accept", "")
+    index_file = STATIC_DIR / "index.html"
+    if "text/html" in accept_header and index_file.exists():
+        return FileResponse(index_file)
+
     return {
         "service": "Customer Lifetime Value (CLV) Prediction API",
         "version": API_VERSION,
         "docs_url": "/docs",
+        "dashboard_url": "/dashboard",
         "redoc_url": "/redoc",
         "health_check": "/health",
         "model_metadata": "/metadata",
