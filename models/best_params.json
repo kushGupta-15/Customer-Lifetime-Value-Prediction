@@ -1,0 +1,12 @@
+{
+  "model": "RandomForest",
+  "cv_mae": 386.5509039480572,
+  "random_seed": 42,
+  "params": {
+    "n_estimators": 450,
+    "max_depth": 22,
+    "min_samples_leaf": 3,
+    "min_samples_split": 3,
+    "max_features": 0.7819511762562903
+  }
+}
