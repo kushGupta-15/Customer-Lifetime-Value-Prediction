@@ -177,3 +177,37 @@ def test_predict_from_transactions():
     # Should have 3 valid distinct invoices (cancellation dropped)
     assert data["derived_features"]["frequency"] == 3
     assert data["prediction"]["predicted_clv_90d"] >= 0.0
+
+
+def test_dashboard_endpoint():
+    """Verify /dashboard returns HTML dashboard interface."""
+    response = client.get("/dashboard")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "CLV Forecast Studio" in response.text
+
+
+def test_root_browser_content_negotiation():
+    """Verify GET / with Accept: text/html serves HTML dashboard."""
+    response = client.get("/", headers={"Accept": "text/html,application/xhtml+xml"})
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "CLV Forecast Studio" in response.text
+
+
+def test_root_json_content_negotiation():
+    """Verify GET / with Accept: application/json returns API metadata."""
+    response = client.get("/", headers={"Accept": "application/json"})
+    assert response.status_code == 200
+    data = response.json()
+    assert "service" in data
+    assert "dashboard_url" in data
+
+
+def test_static_sample_csv_download():
+    """Verify sample CSV template is served statically."""
+    response = client.get("/static/customer_features_sample.csv")
+    assert response.status_code == 200
+    assert "customer_id" in response.text
+    assert "recency_days" in response.text
+
