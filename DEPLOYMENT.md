@@ -61,11 +61,12 @@ pip install -r requirements-serve.txt
 pytest tests/ -v
 ```
 
-### Step 4: Launch API Locally
+### Step 4: Launch Application & Dashboard Locally
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
-Interactive Swagger API documentation will be available at: **`http://localhost:8000/docs`**
+- **Interactive Web Dashboard**: **`http://localhost:8000/`** (or `http://localhost:8000/dashboard`)
+- **Interactive Swagger API Documentation**: **`http://localhost:8000/docs`**
 
 ---
 
